@@ -364,6 +364,7 @@ class Game:
             if not self.game_over:
                 input("\nPress Enter to continue...")
 
+# Main function to run the game
 if __name__ == "__main__":
     game = Game()
     game.play() 
