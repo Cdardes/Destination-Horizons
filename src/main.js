@@ -64,6 +64,10 @@ export class MansionMystery {
         const blocker = document.getElementById('blocker');
         const instructions = document.getElementById('instructions');
 
+        instructions.addEventListener('click', () => {
+            this.controls.lock();
+        });
+
         this.controls.addEventListener('lock', () => {
             instructions.style.display = 'none';
             blocker.style.display = 'none';
