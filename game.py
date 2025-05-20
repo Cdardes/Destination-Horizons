@@ -9,11 +9,11 @@ init()
 
 class Game:
     def __init__(self):
-        self.player_name = ""
-        self.inventory = []
+        self.player_name = "Morphius"
+        self.inventory = []  # Start with empty inventory
         self.current_location = "entrance_hall"
-        self.discovered_clues = set()
-        self.interviewed_suspects = set()
+        self.discovered_clues = set()  # Start with no clues
+        self.interviewed_suspects = set()  # Start with no interviewed suspects
         self.game_over = False
         self.accusation_made = False
         self.turns = 0
