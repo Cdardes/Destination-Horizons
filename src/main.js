@@ -3,7 +3,7 @@ import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockCont
 import { RoomBuilder } from './models/RoomBuilder';
 import { GameState } from './gameState';
 
-class MansionMystery {
+export class MansionMystery {
     constructor() {
         this.scene = new THREE.Scene();
         this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -237,8 +237,12 @@ class MansionMystery {
             return;
         }
 
-        this.raycaster.setFromCamera(new THREE.Vector2(), this.camera);
-        const intersects = this.raycaster.intersectObjects(this.scene.children, true);
+        // Create a ray from the camera center
+        const raycaster = new THREE.Raycaster();
+        const center = new THREE.Vector2(0, 0);
+        raycaster.setFromCamera(center, this.camera);
+        
+        const intersects = raycaster.intersectObjects(this.scene.children, true);
 
         if (intersects.length > 0) {
             const object = intersects[0].object;
@@ -249,20 +253,10 @@ class MansionMystery {
     }
 
     handleInteraction(object) {
-        switch (object.userData.type) {
-            case 'clue':
-                this.collectClue(object);
-                break;
-            case 'door':
-                this.tryDoor(object);
-                break;
-            case 'suspect':
-                this.talkToSuspect(object.userData.name);
-                break;
-            case 'furniture':
-                this.examineObject(object);
-                break;
+        if (object.userData.type === 'clue') {
+            this.collectClue(object);
         }
+        // Add other interaction types as needed
     }
 
     collectClue(object) {

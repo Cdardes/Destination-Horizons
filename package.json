@@ -1,8 +1,9 @@
 {
   "name": "mansion-mystery-3d",
   "version": "1.0.0",
-  "description": "A 3D web-based mansion mystery game",
-  "main": "src/index.js",
+  "description": "A 3D mystery game set in a mansion",
+  "main": "src/main.js",
+  "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

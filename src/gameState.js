@@ -4,6 +4,7 @@ export class GameState {
         this.inventory = [];
         this.discoveredClues = new Set();
         this.interviewedSuspects = new Set();
+        this.currentLocation = 'entrance_hall';
         this.gameOver = false;
         this.accusationMade = false;
         this.turns = 0;
@@ -120,25 +121,102 @@ export class GameState {
             requiredClues: new Set(["strange_letter", "torn_page", "recipe_book"]),
             story: "Professor Blackwood, desperate for research funding, poisoned his brother to inherit the estate."
         };
+
+        this.initializeUI();
     }
 
-    checkAccusation(accusedSuspect) {
+    initializeUI() {
+        this.updateLocationName();
+        this.updateTurnsRemaining();
+        this.updateInventoryDisplay();
+    }
+
+    updateLocationName() {
+        const locationNames = {
+            'entrance_hall': 'Entrance Hall',
+            'library': 'Library',
+            'dining_room': 'Dining Room',
+            'kitchen': 'Kitchen',
+            'grand_staircase': 'Grand Staircase',
+            'master_bedroom': 'Master Bedroom'
+        };
+        
+        const locationElement = document.getElementById('location-name');
+        if (locationElement) {
+            locationElement.textContent = locationNames[this.currentLocation] || this.currentLocation;
+        }
+    }
+
+    updateTurnsRemaining() {
+        const turnsElement = document.getElementById('turns-remaining');
+        if (turnsElement) {
+            turnsElement.textContent = `Turns remaining: ${this.maxTurns - this.turns}`;
+        }
+    }
+
+    updateInventoryDisplay() {
+        const inventoryElement = document.getElementById('inventory-items');
+        if (!inventoryElement) return;
+
+        inventoryElement.innerHTML = '';
+        this.inventory.forEach(item => {
+            const itemElement = document.createElement('div');
+            itemElement.className = 'inventory-item';
+            itemElement.textContent = item.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+            inventoryElement.appendChild(itemElement);
+        });
+    }
+
+    addToInventory(item) {
+        if (!this.inventory.includes(item)) {
+            this.inventory.push(item);
+            this.discoveredClues.add(item);
+            this.updateInventoryDisplay();
+            this.showNotification(`Added ${item.replace(/_/g, ' ')} to inventory`);
+        }
+    }
+
+    showNotification(message) {
+        const notification = document.createElement('div');
+        notification.className = 'notification';
+        notification.textContent = message;
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            notification.remove();
+        }, 3000);
+    }
+
+    incrementTurns() {
+        this.turns++;
+        this.updateTurnsRemaining();
+        
+        if (this.turns >= this.maxTurns && !this.accusationMade) {
+            this.gameOver = true;
+            this.showNotification('Time\'s up! The trail has gone cold...');
+            return true;
+        }
+        return false;
+    }
+
+    checkAccusation(accused) {
         this.accusationMade = true;
         this.gameOver = true;
         
-        const hasRequiredClues = [...this.solution.requiredClues].every(clue => 
-            this.discoveredClues.has(clue)
-        );
-        
-        return {
-            correct: accusedSuspect === this.solution.culprit && hasRequiredClues,
-            story: this.solution.story,
-            message: hasRequiredClues ? 
-                (accusedSuspect === this.solution.culprit ? 
-                    "Congratulations! You've solved the case!" : 
-                    "Wrong accusation! The real culprit gets away...") :
-                "You don't have enough evidence to make a convincing case!"
-        };
+        if (accused === this.solution.culprit && 
+            Array.from(this.solution.requiredClues).every(clue => this.discoveredClues.has(clue))) {
+            this.showNotification('Congratulations! You\'ve solved the case!');
+            return true;
+        } else {
+            this.showNotification('Your accusation is incorrect or you lack sufficient evidence!');
+            return false;
+        }
+    }
+
+    setLocation(location) {
+        this.currentLocation = location;
+        this.updateLocationName();
     }
 
     addClue(clue) {
@@ -156,19 +234,6 @@ export class GameState {
             return true;
         }
         return false;
-    }
-
-    incrementTurns() {
-        this.turns++;
-        if (this.turns >= this.maxTurns) {
-            this.gameOver = true;
-            return false;
-        }
-        return true;
-    }
-
-    getRemainingTurns() {
-        return this.maxTurns - this.turns;
     }
 
     getLocationInfo(locationId) {
