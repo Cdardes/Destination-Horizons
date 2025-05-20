@@ -15,6 +15,25 @@
             width: 100vw;
             height: 100vh;
         }
+        #blocker {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        #instructions {
+            color: #ffffff;
+            text-align: center;
+            font-size: 14px;
+            cursor: pointer;
+            max-width: 400px;
+            padding: 20px;
+            background-color: rgba(0, 0, 0, 0.7);
+            border-radius: 10px;
+        }
         #ui-overlay {
             position: absolute;
             top: 20px;
@@ -24,6 +43,7 @@
             padding: 20px;
             border-radius: 10px;
             pointer-events: none;
+            z-index: 100;
         }
         #inventory-panel {
             position: absolute;
@@ -33,6 +53,8 @@
             color: white;
             padding: 20px;
             border-radius: 10px;
+            display: none;
+            z-index: 100;
         }
         #interaction-menu {
             position: absolute;
@@ -44,6 +66,7 @@
             padding: 20px;
             border-radius: 10px;
             display: none;
+            z-index: 100;
         }
         .menu-option {
             cursor: pointer;
@@ -55,10 +78,76 @@
         .menu-option:hover {
             background: rgba(255, 255, 255, 0.2);
         }
+        .inventory-item {
+            padding: 5px;
+            margin: 2px 0;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+        }
+        .notification {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            z-index: 1000;
+            animation: fadeInOut 3s ease-in-out;
+        }
+        .crosshair {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 20px;
+            pointer-events: none;
+            z-index: 1000;
+        }
+        .crosshair::before,
+        .crosshair::after {
+            content: '';
+            position: absolute;
+            background: white;
+            opacity: 0.7;
+        }
+        .crosshair::before {
+            width: 2px;
+            height: 20px;
+            left: 9px;
+            top: 0;
+        }
+        .crosshair::after {
+            width: 20px;
+            height: 2px;
+            left: 0;
+            top: 9px;
+        }
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+            10% { opacity: 1; transform: translateX(-50%) translateY(0); }
+            90% { opacity: 1; transform: translateX(-50%) translateY(0); }
+            100% { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+        }
     </style>
 </head>
 <body>
     <div id="game-container">
+        <div id="blocker">
+            <div id="instructions">
+                <h1>The Mansion Mystery</h1>
+                <p>Click to start</p>
+                <br>
+                <p>Move: WASD</p>
+                <p>Look: Mouse</p>
+                <p>Interact: Left Click</p>
+                <p>Inventory: E</p>
+                <p>Menu: ESC</p>
+            </div>
+        </div>
+        <div class="crosshair"></div>
         <div id="ui-overlay">
             <h2>Current Location: <span id="location-name">Entrance Hall</span></h2>
             <p id="turns-remaining">Turns remaining: 20</p>

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
+import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls';
+import { RoomBuilder } from './models/RoomBuilder';
+import { GameState } from './gameState';
 
 class MansionMystery {
     constructor() {
@@ -10,39 +11,151 @@ class MansionMystery {
         this.controls = null;
         this.rooms = {};
         this.currentRoom = 'entrance_hall';
-        this.inventory = [];
-        this.turns = 0;
-        this.maxTurns = 20;
+        this.gameState = new GameState();
+        this.roomBuilder = new RoomBuilder();
+        
+        // Movement
+        this.moveForward = false;
+        this.moveBackward = false;
+        this.moveLeft = false;
+        this.moveRight = false;
+        this.canMove = true;
+        this.velocity = new THREE.Vector3();
+        this.direction = new THREE.Vector3();
+        this.prevTime = performance.now();
 
         this.init();
         this.setupLighting();
         this.loadRooms();
         this.setupControls();
+        this.setupEventListeners();
         this.animate();
     }
 
     init() {
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         this.renderer.shadowMap.enabled = true;
+        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         document.getElementById('game-container').appendChild(this.renderer.domElement);
 
         // Set initial camera position
-        this.camera.position.set(0, 2, 5);
-        this.camera.lookAt(0, 0, 0);
+        this.camera.position.set(0, 1.7, 5); // Average human height
+        this.camera.lookAt(0, 1.7, 0);
 
+        // Setup raycaster for interaction
+        this.raycaster = new THREE.Raycaster();
+        this.mouse = new THREE.Vector2();
+
+        // Create interaction highlight material
+        this.highlightMaterial = new THREE.MeshBasicMaterial({
+            color: 0xffff00,
+            opacity: 0.5,
+            transparent: true
+        });
+        
+        // Store original materials for highlighted objects
+        this.originalMaterials = new WeakMap();
+    }
+
+    setupControls() {
+        this.controls = new PointerLockControls(this.camera, document.body);
+
+        // Setup pointer lock
+        const blocker = document.getElementById('blocker');
+        const instructions = document.getElementById('instructions');
+
+        this.controls.addEventListener('lock', () => {
+            instructions.style.display = 'none';
+            blocker.style.display = 'none';
+            this.canMove = true;
+        });
+
+        this.controls.addEventListener('unlock', () => {
+            blocker.style.display = 'block';
+            instructions.style.display = '';
+            this.canMove = false;
+        });
+    }
+
+    setupEventListeners() {
+        // Movement controls
+        const onKeyDown = (event) => {
+            switch (event.code) {
+                case 'ArrowUp':
+                case 'KeyW':
+                    this.moveForward = true;
+                    break;
+                case 'ArrowDown':
+                case 'KeyS':
+                    this.moveBackward = true;
+                    break;
+                case 'ArrowLeft':
+                case 'KeyA':
+                    this.moveLeft = true;
+                    break;
+                case 'ArrowRight':
+                case 'KeyD':
+                    this.moveRight = true;
+                    break;
+                case 'KeyE':
+                    this.toggleInventory();
+                    break;
+                case 'Escape':
+                    this.toggleMenu();
+                    break;
+            }
+        };
+
+        const onKeyUp = (event) => {
+            switch (event.code) {
+                case 'ArrowUp':
+                case 'KeyW':
+                    this.moveForward = false;
+                    break;
+                case 'ArrowDown':
+                case 'KeyS':
+                    this.moveBackward = false;
+                    break;
+                case 'ArrowLeft':
+                case 'KeyA':
+                    this.moveLeft = false;
+                    break;
+                case 'ArrowRight':
+                case 'KeyD':
+                    this.moveRight = false;
+                    break;
+            }
+        };
+
+        document.addEventListener('keydown', onKeyDown);
+        document.addEventListener('keyup', onKeyUp);
+        document.addEventListener('click', (event) => this.onMouseClick(event));
+        document.addEventListener('mousemove', (event) => this.onMouseMove(event));
+        
         // Handle window resize
         window.addEventListener('resize', () => {
             this.camera.aspect = window.innerWidth / window.innerHeight;
             this.camera.updateProjectionMatrix();
             this.renderer.setSize(window.innerWidth, window.innerHeight);
         });
+    }
 
-        // Setup raycaster for interaction
-        this.raycaster = new THREE.Raycaster();
-        this.mouse = new THREE.Vector2();
+    loadRooms() {
+        const roomTypes = [
+            'entrance_hall',
+            'library',
+            'dining_room',
+            'kitchen',
+            'grand_staircase',
+            'master_bedroom'
+        ];
 
-        // Add click event listener
-        window.addEventListener('click', (event) => this.onMouseClick(event));
+        roomTypes.forEach(type => {
+            const room = this.roomBuilder.createRoom(type);
+            this.rooms[type] = room;
+            room.visible = type === this.currentRoom;
+            this.scene.add(room);
+        });
     }
 
     setupLighting() {
@@ -51,136 +164,143 @@ class MansionMystery {
         this.scene.add(ambientLight);
 
         // Directional light (simulates sunlight)
-        const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
         dirLight.position.set(5, 5, 5);
         dirLight.castShadow = true;
         this.scene.add(dirLight);
 
-        // Point lights for atmosphere
-        const pointLight1 = new THREE.PointLight(0xff9900, 1, 10);
-        pointLight1.position.set(2, 2, 2);
-        this.scene.add(pointLight1);
-    }
-
-    setupControls() {
-        this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-        this.controls.enableDamping = true;
-        this.controls.dampingFactor = 0.05;
-        this.controls.maxPolarAngle = Math.PI / 2;
-    }
-
-    loadRooms() {
-        const loader = new GLTFLoader();
-
-        // Load room models
-        // Note: These are placeholder paths - you'll need to create actual 3D models
-        const roomsToLoad = {
-            'entrance_hall': '/models/entrance_hall.glb',
-            'library': '/models/library.glb',
-            'dining_room': '/models/dining_room.glb',
-            'kitchen': '/models/kitchen.glb',
-            'grand_staircase': '/models/grand_staircase.glb',
-            'master_bedroom': '/models/master_bedroom.glb'
-        };
-
-        Object.entries(roomsToLoad).forEach(([roomName, modelPath]) => {
-            // For now, create placeholder geometry
-            const geometry = new THREE.BoxGeometry(10, 8, 10);
-            const material = new THREE.MeshStandardMaterial({ 
-                color: 0x808080,
-                wireframe: true
-            });
-            const room = new THREE.Mesh(geometry, material);
-            this.rooms[roomName] = room;
-
-            // Hide all rooms except the current one
-            room.visible = roomName === this.currentRoom;
-            this.scene.add(room);
-
-            // TODO: Replace with actual model loading when available
-            /*
-            loader.load(modelPath, (gltf) => {
-                this.rooms[roomName] = gltf.scene;
-                this.rooms[roomName].visible = roomName === this.currentRoom;
-                this.scene.add(this.rooms[roomName]);
-            });
-            */
-        });
-    }
-
-    changeRoom(newRoom) {
-        if (this.rooms[this.currentRoom]) {
-            this.rooms[this.currentRoom].visible = false;
-        }
-        this.currentRoom = newRoom;
-        if (this.rooms[this.currentRoom]) {
-            this.rooms[this.currentRoom].visible = true;
-        }
-        document.getElementById('location-name').textContent = this.currentRoom.replace('_', ' ').toUpperCase();
-    }
-
-    onMouseClick(event) {
-        this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-        this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
-        this.raycaster.setFromCamera(this.mouse, this.camera);
-        const intersects = this.raycaster.intersectObjects(this.scene.children, true);
-
-        if (intersects.length > 0) {
-            const clickedObject = intersects[0].object;
-            // Handle object interaction
-            this.showInteractionMenu(clickedObject);
-        }
-    }
-
-    showInteractionMenu(object) {
-        const menu = document.getElementById('interaction-menu');
-        menu.style.display = 'block';
-        // Populate menu options based on the clicked object
-        // TODO: Implement specific interactions based on object type
+        // Improve shadow quality
+        dirLight.shadow.mapSize.width = 2048;
+        dirLight.shadow.mapSize.height = 2048;
+        dirLight.shadow.camera.near = 0.5;
+        dirLight.shadow.camera.far = 50;
     }
 
     animate() {
         requestAnimationFrame(() => this.animate());
-        this.controls.update();
+
+        if (this.canMove) {
+            const time = performance.now();
+            const delta = (time - this.prevTime) / 1000;
+
+            this.velocity.x -= this.velocity.x * 10.0 * delta;
+            this.velocity.z -= this.velocity.z * 10.0 * delta;
+
+            this.direction.z = Number(this.moveForward) - Number(this.moveBackward);
+            this.direction.x = Number(this.moveRight) - Number(this.moveLeft);
+            this.direction.normalize();
+
+            const speed = 5.0;
+            if (this.moveForward || this.moveBackward) {
+                this.velocity.z -= this.direction.z * speed * delta;
+            }
+            if (this.moveLeft || this.moveRight) {
+                this.velocity.x -= this.direction.x * speed * delta;
+            }
+
+            this.controls.moveRight(-this.velocity.x * delta);
+            this.controls.moveForward(-this.velocity.z * delta);
+
+            this.prevTime = time;
+        }
+
+        this.checkInteractions();
         this.renderer.render(this.scene, this.camera);
     }
 
-    // Game mechanics methods
-    lookAround() {
-        // Implement look around functionality
-        this.turns++;
-        this.updateTurnsDisplay();
-    }
+    checkInteractions() {
+        // Cast a ray from the camera
+        this.raycaster.setFromCamera(new THREE.Vector2(), this.camera);
+        const intersects = this.raycaster.intersectObjects(this.scene.children, true);
 
-    checkInventory() {
-        // Implement inventory check
-        const inventoryPanel = document.getElementById('inventory-items');
-        inventoryPanel.innerHTML = this.inventory.map(item => `<div>${item}</div>`).join('');
-    }
+        // Reset all previously highlighted objects
+        this.originalMaterials.forEach((material, object) => {
+            object.material = material;
+        });
+        this.originalMaterials.clear();
 
-    talkToSuspect() {
-        // Implement suspect interaction
-        this.turns++;
-        this.updateTurnsDisplay();
-    }
-
-    makeAccusation() {
-        // Implement accusation system
-        this.turns++;
-        this.updateTurnsDisplay();
-    }
-
-    updateTurnsDisplay() {
-        document.getElementById('turns-remaining').textContent = `Turns remaining: ${this.maxTurns - this.turns}`;
-        if (this.turns >= this.maxTurns) {
-            this.gameOver();
+        // Highlight the first interactive object found
+        for (const intersect of intersects) {
+            const object = intersect.object;
+            if (object.userData.interactive) {
+                // Store original material and apply highlight
+                this.originalMaterials.set(object, object.material);
+                object.material = this.highlightMaterial;
+                break;
+            }
         }
     }
 
-    gameOver() {
-        alert('Game Over! You ran out of turns.');
-        // Implement game over logic
+    onMouseClick(event) {
+        if (!this.controls.isLocked) {
+            this.controls.lock();
+            return;
+        }
+
+        this.raycaster.setFromCamera(new THREE.Vector2(), this.camera);
+        const intersects = this.raycaster.intersectObjects(this.scene.children, true);
+
+        if (intersects.length > 0) {
+            const object = intersects[0].object;
+            if (object.userData.interactive) {
+                this.handleInteraction(object);
+            }
+        }
+    }
+
+    handleInteraction(object) {
+        switch (object.userData.type) {
+            case 'clue':
+                this.collectClue(object);
+                break;
+            case 'door':
+                this.tryDoor(object);
+                break;
+            case 'suspect':
+                this.talkToSuspect(object.userData.name);
+                break;
+            case 'furniture':
+                this.examineObject(object);
+                break;
+        }
+    }
+
+    collectClue(object) {
+        const clueName = object.userData.name;
+        if (this.gameState.addClue(clueName)) {
+            // Remove the clue from the scene
+            object.parent.remove(object);
+            this.updateInventoryDisplay();
+            this.showNotification(`Found clue: ${clueName.replace('_', ' ')}`);
+        }
+    }
+
+    updateInventoryDisplay() {
+        const inventoryPanel = document.getElementById('inventory-items');
+        inventoryPanel.innerHTML = this.gameState.inventory
+            .map(item => `<div class="inventory-item">${item.replace('_', ' ')}</div>`)
+            .join('');
+    }
+
+    showNotification(message) {
+        const notification = document.createElement('div');
+        notification.className = 'notification';
+        notification.textContent = message;
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            notification.remove();
+        }, 3000);
+    }
+
+    toggleInventory() {
+        const inventory = document.getElementById('inventory-panel');
+        inventory.style.display = inventory.style.display === 'none' ? 'block' : 'none';
+    }
+
+    toggleMenu() {
+        const menu = document.getElementById('interaction-menu');
+        menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
     }
 }
 
