@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { LibraryRoom } from './rooms/LibraryRoom';
+import { EntranceHall } from './rooms/EntranceHall';
 
 export class RoomBuilder {
     constructor() {
@@ -37,36 +39,23 @@ export class RoomBuilder {
     }
 
     createRoom(type, dimensions = { width: 10, height: 4, depth: 10 }) {
+        switch (type) {
+            case 'library':
+                return new LibraryRoom().createRoom();
+            case 'entrance_hall':
+                return new EntranceHall().createRoom();
+            default:
+                return this.createBasicRoom(dimensions);
+        }
+    }
+
+    createBasicRoom(dimensions) {
         const room = new THREE.Group();
-        room.userData.type = type;
-        room.userData.interactive = true;
 
         // Add basic room structure
         this.addFloor(room, dimensions);
         this.addWalls(room, dimensions);
         this.addCeiling(room, dimensions);
-        
-        // Add room-specific furniture and items
-        switch (type) {
-            case 'entrance_hall':
-                this.addEntranceHallFurniture(room, dimensions);
-                break;
-            case 'library':
-                this.addLibraryFurniture(room, dimensions);
-                break;
-            case 'dining_room':
-                this.addDiningRoomFurniture(room, dimensions);
-                break;
-            case 'kitchen':
-                this.addKitchenFurniture(room, dimensions);
-                break;
-            case 'grand_staircase':
-                this.addStaircaseFurniture(room, dimensions);
-                break;
-            case 'master_bedroom':
-                this.addBedroomFurniture(room, dimensions);
-                break;
-        }
 
         return room;
     }
@@ -186,35 +175,6 @@ export class RoomBuilder {
         return object;
     }
 
-    addEntranceHallFurniture(room, dimensions) {
-        // Add chandelier
-        const chandelier = this.createChandelier();
-        chandelier.position.set(0, dimensions.height - 1, 0);
-        room.add(chandelier);
-
-        // Add console table
-        const consoleTable = this.createConsoleTable();
-        consoleTable.position.set(0, 0, -dimensions.depth/2 + 1);
-        room.add(consoleTable);
-
-        // Add muddy footprint (interactive clue)
-        const footprintGeometry = new THREE.PlaneGeometry(0.5, 1);
-        const footprintMaterial = new THREE.MeshBasicMaterial({ 
-            color: 0x4a3c2a,
-            transparent: true,
-            opacity: 0.7
-        });
-        const footprint = this.createInteractiveObject(
-            footprintGeometry,
-            footprintMaterial,
-            new THREE.Vector3(-1, 0.01, 0),
-            "muddy_footprint",
-            "clue"
-        );
-        footprint.rotation.x = -Math.PI / 2;
-        room.add(footprint);
-    }
-
     createChandelier() {
         const group = new THREE.Group();
         
@@ -241,28 +201,6 @@ export class RoomBuilder {
             const bulb = new THREE.Mesh(bulbGeometry, this.materials.glass);
             bulb.position.copy(light.position);
             group.add(bulb);
-        }
-        
-        return group;
-    }
-
-    createConsoleTable() {
-        const group = new THREE.Group();
-        
-        // Table top
-        const topGeometry = new THREE.BoxGeometry(2, 0.1, 0.8);
-        const top = new THREE.Mesh(topGeometry, this.materials.wood);
-        top.position.y = 1;
-        group.add(top);
-        
-        // Legs
-        const legGeometry = new THREE.BoxGeometry(0.1, 1, 0.1);
-        for (let x = -0.9; x <= 0.9; x += 1.8) {
-            for (let z = -0.3; z <= 0.3; z += 0.6) {
-                const leg = new THREE.Mesh(legGeometry, this.materials.wood);
-                leg.position.set(x, 0.5, z);
-                group.add(leg);
-            }
         }
         
         return group;
