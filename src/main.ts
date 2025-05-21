@@ -5,7 +5,6 @@ import { RectAreaLightHelper } from 'three/examples/jsm/helpers/RectAreaLightHel
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js';
 import { SoundManager } from './SoundManager';
 import { generateSoundFiles } from './generateSounds';
-import { EffectComposer, RenderPass, UnrealBloomPass, SSAOPass, ShaderPass } from 'three/examples/jsm/postprocessing';
 
 // Add sound generation to window object
 declare global {
@@ -136,80 +135,84 @@ class Game {
     private rooms: Map<string, Room> = new Map();
     private interactiveObjects: THREE.Mesh[] = [];
     private inventory: string[] = [];
-    private composer: EffectComposer | null = null;
 
     constructor() {
         console.log('Initializing game...');
         
-        // Initialize settings
-        this.settings = {
-            movementSpeed: 100.0,
-            damping: 5.0,
-            ambientIntensity: 0.5,
-            fogDensity: 0.03,
-            masterVolume: 0.7,
-            footstepsVolume: 0.5,
-            ambientVolume: 0.3
-        };
+        try {
+            // Initialize settings
+            this.settings = {
+                movementSpeed: 100.0,
+                damping: 5.0,
+                ambientIntensity: 0.5,
+                fogDensity: 0.03,
+                masterVolume: 0.7,
+                footstepsVolume: 0.5,
+                ambientVolume: 0.3
+            };
 
-        // Initialize vectors and clock
-        this.velocity = new THREE.Vector3();
-        this.direction = new THREE.Vector3();
-        this.clock = new THREE.Clock();
+            // Initialize vectors and clock
+            this.velocity = new THREE.Vector3();
+            this.direction = new THREE.Vector3();
+            this.clock = new THREE.Clock();
 
-        // Initialize rooms first
-        this.initializeRooms();
+            // Initialize renderer first
+            this.initializeRenderer();
+            
+            // Create scene
+            this.scene = new THREE.Scene();
+            this.scene.background = new THREE.Color(0x1a1a1a);
+            this.scene.fog = new THREE.FogExp2(0x1a1a1a, this.settings.fogDensity);
 
-        // Create scene
-        this.scene = new THREE.Scene();
-        this.scene.background = new THREE.Color(0x1a1a1a);
-        this.scene.fog = new THREE.FogExp2(0x1a1a1a, this.settings.fogDensity);
+            // Initialize RectAreaLight
+            RectAreaLightUniformsLib.init();
 
-        // Initialize RectAreaLight
-        RectAreaLightUniformsLib.init();
+            // Create camera with audio listener
+            this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            this.camera.position.y = 1.6;
+            this.camera.position.z = 5;
 
-        // Create camera with audio listener
-        this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        this.camera.position.y = 1.6;
-        this.camera.position.z = 5;
+            // Initialize raycaster for interactions
+            this.raycaster = new THREE.Raycaster();
 
-        // Initialize raycaster for interactions
-        this.raycaster = new THREE.Raycaster();
+            // Initialize audio
+            const listener = new THREE.AudioListener();
+            this.camera.add(listener);
+            this.soundManager = new SoundManager(listener);
 
-        // Initialize audio
-        const listener = new THREE.AudioListener();
-        this.camera.add(listener);
-        this.soundManager = new SoundManager(listener);
+            // Set initial volumes
+            this.soundManager.setVolume('ambient', this.settings.masterVolume * this.settings.ambientVolume);
+            this.soundManager.setVolume('footstep', this.settings.masterVolume * this.settings.footstepsVolume);
 
-        // Set initial volumes
-        this.soundManager.setVolume('ambient', this.settings.masterVolume * this.settings.ambientVolume);
-        this.soundManager.setVolume('footstep', this.settings.masterVolume * this.settings.footstepsVolume);
+            // Append renderer to DOM
+            const appElement = document.querySelector('#app');
+            if (!appElement) {
+                throw new Error('#app element not found');
+            }
+            appElement.appendChild(this.renderer.domElement);
 
-        // Initialize renderer before using it
-        this.initializeRenderer();
-        
-        const appElement = document.querySelector('#app');
-        if (!appElement) {
-            throw new Error('#app element not found');
+            // Create controls after renderer is added to DOM
+            this.controls = new PointerLockControls(this.camera, document.body);
+
+            // Initialize rooms and scene content
+            this.initializeRooms();
+            this.createScene();
+
+            // Setup GUI and event listeners
+            this.setupGUI();
+            this.setupEventListeners();
+            
+            console.log('Game initialized successfully');
+
+            // Start animation loop
+            this.animate();
+            
+            // Force a resize to ensure proper initial sizing
+            window.dispatchEvent(new Event('resize'));
+        } catch (error) {
+            console.error('Failed to initialize game:', error);
+            throw error;
         }
-        appElement.appendChild(this.renderer.domElement);
-
-        // Create controls
-        this.controls = new PointerLockControls(this.camera, document.body);
-
-        // Setup GUI
-        this.setupGUI();
-
-        // Add event listeners
-        this.setupEventListeners();
-
-        // Create basic scene
-        this.createScene();
-        
-        console.log('Game initialized successfully');
-
-        // Start animation loop
-        this.animate();
     }
 
     private initializeRooms(): void {
@@ -483,31 +486,57 @@ class Game {
         // Lock controls on click
         const startPrompt = document.querySelector('.click-to-start');
         if (!startPrompt) {
-            throw new Error('.click-to-start element not found');
+            console.error('Warning: .click-to-start element not found');
+            return;
         }
         
-        startPrompt.addEventListener('click', () => {
-            console.log('Starting game...');
-            this.controls.lock();
+        const startGame = () => {
+            console.log('Attempting to start game...');
+            try {
+                this.controls.lock();
+            } catch (error) {
+                console.error('Failed to lock controls:', error);
+            }
+        };
+
+        startPrompt.addEventListener('click', startGame);
+        document.addEventListener('keydown', (event) => {
+            if (event.code === 'Enter' && !this.controls.isLocked) {
+                startGame();
+            }
         });
 
         // Handle pointer lock change
-        document.addEventListener('pointerlockchange', () => {
+        const handleLockChange = () => {
             const prompt = document.querySelector('.click-to-start') as HTMLElement;
+            const isLocked = document.pointerLockElement !== null;
+            
             if (prompt) {
-                prompt.style.display = this.controls.isLocked ? 'none' : 'block';
+                prompt.style.display = isLocked ? 'none' : 'block';
             }
             
             // Handle ambient sound
-            if (this.controls.isLocked) {
+            if (isLocked) {
                 this.soundManager.playSound('ambient');
             } else {
                 this.soundManager.stopAll();
             }
+        };
+
+        document.addEventListener('pointerlockchange', handleLockChange);
+        document.addEventListener('pointerlockerror', (error) => {
+            console.error('Pointer lock error:', error);
+            const prompt = document.querySelector('.click-to-start') as HTMLElement;
+            if (prompt) {
+                prompt.textContent = 'Click to retry (Pointer lock failed)';
+                prompt.style.display = 'block';
+            }
         });
 
         // Handle movement
-        document.addEventListener('keydown', (event) => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (!this.controls.isLocked) return;
+
             switch (event.code) {
                 case 'ArrowUp':
                 case 'KeyW':
@@ -527,11 +556,12 @@ class Game {
                     break;
             }
             
-            // Update footstep sounds
             this.updateFootstepSounds();
-        });
+        };
 
-        document.addEventListener('keyup', (event) => {
+        const handleKeyUp = (event: KeyboardEvent) => {
+            if (!this.controls.isLocked) return;
+
             switch (event.code) {
                 case 'ArrowUp':
                 case 'KeyW':
@@ -551,28 +581,41 @@ class Game {
                     break;
             }
             
-            // Update footstep sounds
             this.updateFootstepSounds();
-        });
+        };
+
+        document.addEventListener('keydown', handleKeyDown);
+        document.addEventListener('keyup', handleKeyUp);
 
         // Handle window resize
-        window.addEventListener('resize', () => {
+        const handleResize = () => {
             this.camera.aspect = window.innerWidth / window.innerHeight;
             this.camera.updateProjectionMatrix();
             this.renderer.setSize(window.innerWidth, window.innerHeight);
-        });
+        };
+
+        window.addEventListener('resize', handleResize);
 
         // Add interaction key (E)
         document.addEventListener('keydown', (event) => {
-            if (event.code === 'KeyE') {
+            if (event.code === 'KeyE' && this.controls.isLocked) {
                 this.interact();
             }
         });
 
         // Add room transition key (Space)
         document.addEventListener('keydown', (event) => {
-            if (event.code === 'Space') {
+            if (event.code === 'Space' && this.controls.isLocked) {
                 this.checkRoomTransition();
+            }
+        });
+
+        // Handle visibility change
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                this.soundManager.stopAll();
+            } else if (this.controls.isLocked) {
+                this.soundManager.playSound('ambient');
             }
         });
     }
@@ -790,25 +833,15 @@ class Game {
     }
 
     private addRoomLighting(roomId: string): void {
-        // Add basic lighting first
-        this.addBasicLighting(roomId);
-        
-        // Add dynamic lighting effects
-        this.addDynamicLighting(roomId);
-    }
-
-    private addBasicLighting(roomId: string): void {
         // Add ambient light
         const ambientLight = new THREE.AmbientLight(0x404040, this.settings.ambientIntensity);
         this.scene.add(ambientLight);
 
-        // Add room-specific lighting
         switch (roomId) {
             case 'library':
                 // Warm, focused lighting for reading
                 this.addPointLight(0, 3, 0, 1.5, 0xff9966);
                 this.addRectAreaLight(4, 2, 5, 0xffd700, -5, 3, 0);
-                // Add window light
                 this.addWindowLight(-9, 2, 0, 0xadd8e6, 2);
                 break;
             case 'dining_room':
@@ -826,34 +859,25 @@ class Game {
                 this.addWindowLight(9, 2, 0, 0xadd8e6, 1.5);
                 break;
             case 'conservatory':
-                // Bright natural lighting with slight green tint
+                // Bright natural lighting
                 this.addPointLight(0, 4, 0, 2, 0xc8e6c9);
                 this.addWindowLight(14, 2, -14, 0xadd8e6, 2);
-                this.addWindowLight(16, 2, -16, 0xadd8e6, 2);
                 break;
             case 'garden':
-                // Outdoor lighting with moonlight
+                // Outdoor lighting
                 this.addPointLight(15, 10, -30, 3, 0x6897bb);
-                this.addPointLight(15, 1, -30, 1, 0xc8e6c9);
                 break;
             case 'wine_cellar':
-                // Dark, moody lighting with warm spots
+                // Dark, moody lighting
                 this.addPointLight(-15, -3, 0, 1, 0xff9966, 5);
-                this.addPointLight(-14, -3, 2, 0.5, 0xff9966, 3);
                 break;
             case 'attic':
-                // Dusty light through small window
+                // Dusty light
                 this.addPointLight(0, 6, -30, 0.5, 0xffd700);
-                this.addWindowLight(1, 6, -31, 0x666666, 0.5);
                 break;
             case 'secret_passage':
-                // Mysterious flickering light
-                const flickeringLight = this.addPointLight(-30, 2, -15, 1, 0xff9966, 5);
-                setInterval(() => {
-                    if (flickeringLight) {
-                        flickeringLight.intensity = 0.5 + Math.random() * 0.5;
-                    }
-                }, 100);
+                // Basic lighting
+                this.addPointLight(-30, 2, -15, 1, 0xff9966, 5);
                 break;
             default:
                 // Standard room lighting
@@ -1116,47 +1140,37 @@ class Game {
     }
 
     private animate(): void {
-        requestAnimationFrame(() => this.animate());
+        try {
+            // Request next frame first to ensure smooth animation
+            requestAnimationFrame(() => this.animate());
 
-        if (this.controls.isLocked) {
+            // Get delta time for consistent movement speed
             const delta = this.clock.getDelta();
 
-            // Update physics and movement
-            this.updateMovement(delta);
-            
-            // Update matrices for frustum culling
-            this.camera.updateMatrix();
-            this.camera.updateMatrixWorld();
-            
-            // Update visible objects
-            const frustum = new THREE.Frustum().setFromProjectionMatrix(
-                new THREE.Matrix4().multiplyMatrices(
-                    this.camera.projectionMatrix,
-                    this.camera.matrixWorldInverse
-                )
-            );
-            
-            this.scene.traverse((object) => {
-                if (object instanceof THREE.Mesh) {
-                    if (!object.geometry.boundingSphere) {
-                        object.geometry.computeBoundingSphere();
-                    }
-                    const sphere = object.geometry.boundingSphere!.clone();
-                    sphere.applyMatrix4(object.matrixWorld);
-                    object.visible = frustum.intersectsSphere(sphere);
-                }
-            });
+            // Only update if controls are locked
+            if (this.controls.isLocked) {
+                // Update movement
+                this.updateMovement(delta);
 
-            // Check for nearby interactive objects
-            this.checkNearbyObjects();
-        }
+                // Check for nearby objects (items, doors, characters)
+                this.checkNearbyObjects();
 
-        // Render with post-processing
-        if (this.composer) {
-            this.composer.render();
-        } else {
+                // Update any active animations or effects
+                this.updateActiveEffects(delta);
+            }
+
+            // Always render the scene
             this.renderer.render(this.scene, this.camera);
+        } catch (error) {
+            console.error('Animation loop error:', error);
+            // Continue the animation loop despite errors
+            requestAnimationFrame(() => this.animate());
         }
+    }
+
+    private updateActiveEffects(delta: number): void {
+        // Update any active particle systems, animations, or effects
+        // This is a placeholder for future effects
     }
 
     private checkNearbyObjects(): void {
@@ -1783,96 +1797,21 @@ class Game {
         return diary;
     }
 
-    private setupPostProcessing(): void {
-        const composer = new EffectComposer(this.renderer);
-        
-        // Basic render pass
-        const renderPass = new RenderPass(this.scene, this.camera);
-        composer.addPass(renderPass);
-
-        // Enhanced bloom effect
-        const bloomPass = new UnrealBloomPass(
-            new THREE.Vector2(window.innerWidth, window.innerHeight),
-            0.7,  // increased bloom strength
-            0.8,  // increased radius
-            0.35  // adjusted threshold
-        );
-        composer.addPass(bloomPass);
-
-        // Enhanced SSAO (ambient occlusion)
-        const ssaoPass = new SSAOPass(this.scene, this.camera);
-        ssaoPass.kernelRadius = 32;
-        ssaoPass.minDistance = 0.002;
-        ssaoPass.maxDistance = 0.2;
-        ssaoPass.kernelRadius = 16;
-        ssaoPass.minDistance = 0.005;
-        ssaoPass.maxDistance = 0.1;
-        composer.addPass(ssaoPass);
-
-        // Add color correction
-        const effectPass = new ShaderPass(
-            new THREE.ShaderMaterial({
-                uniforms: {
-                    tDiffuse: { value: null },
-                    brightness: { value: 0.05 },
-                    contrast: { value: 1.1 },
-                    saturation: { value: 1.1 }
-                },
-                vertexShader: `
-                    varying vec2 vUv;
-                    void main() {
-                        vUv = uv;
-                        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-                    }
-                `,
-                fragmentShader: `
-                    uniform sampler2D tDiffuse;
-                    uniform float brightness;
-                    uniform float contrast;
-                    uniform float saturation;
-                    varying vec2 vUv;
-                    void main() {
-                        vec4 color = texture2D(tDiffuse, vUv);
-                        // Brightness
-                        color.rgb += brightness;
-                        // Contrast
-                        color.rgb = (color.rgb - 0.5) * contrast + 0.5;
-                        // Saturation
-                        float gray = dot(color.rgb, vec3(0.299, 0.587, 0.114));
-                        color.rgb = mix(vec3(gray), color.rgb, saturation);
-                        gl_FragColor = color;
-                    }
-                `
-            })
-        );
-        composer.addPass(effectPass);
-
-        this.composer = composer;
-    }
-
     private initializeRenderer(): void {
         this.renderer = new THREE.WebGLRenderer({ 
             antialias: true,
             powerPreference: "high-performance",
             stencil: false,
-            depth: true,
-            precision: "mediump",
-            logarithmicDepthBuffer: false
+            depth: true
         });
         
-        // Optimize renderer settings
         this.renderer.setSize(window.innerWidth, window.innerHeight);
-        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Cap pixel ratio
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         this.renderer.shadowMap.enabled = true;
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         this.renderer.outputColorSpace = THREE.SRGBColorSpace;
         this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
         this.renderer.toneMappingExposure = 1.2;
-        
-        // Enable frustum culling
-        this.camera.matrixAutoUpdate = true;
-        this.scene.matrixAutoUpdate = false;
-        this.scene.autoUpdate = false;
     }
 
     private updateMovement(delta: number): void {
@@ -1896,86 +1835,6 @@ class Game {
         // Apply movement
         this.controls.moveRight(-this.velocity.x * delta);
         this.controls.moveForward(-this.velocity.z * delta);
-    }
-
-    private addDynamicLighting(roomId: string): void {
-        switch (roomId) {
-            case 'library':
-                // Add flickering candlelight
-                const candleLight = new THREE.PointLight(0xffd700, 0.5, 3);
-                candleLight.position.set(-14, 1, 0);
-                this.scene.add(candleLight);
-                
-                const candleFlicker = () => {
-                    candleLight.intensity = 0.4 + Math.random() * 0.2;
-                    requestAnimationFrame(candleFlicker);
-                };
-                candleFlicker();
-                break;
-                
-            case 'conservatory':
-                // Add dynamic sunlight that changes color based on time
-                const sunLight = new THREE.DirectionalLight(0xffffff, 1);
-                sunLight.position.set(1, 1, 1);
-                this.scene.add(sunLight);
-                
-                const updateSunlight = () => {
-                    const time = Date.now() * 0.001;
-                    const hue = (Math.sin(time * 0.1) + 1) * 0.1;
-                    sunLight.color.setHSL(hue, 0.5, 0.5);
-                    requestAnimationFrame(updateSunlight);
-                };
-                updateSunlight();
-                break;
-                
-            case 'wine_cellar':
-                // Add dust particles with dynamic lighting
-                const particleSystem = this.createDustParticles();
-                this.scene.add(particleSystem);
-                break;
-        }
-    }
-
-    private createDustParticles(): THREE.Points {
-        const particleCount = 1000;
-        const particles = new Float32Array(particleCount * 3);
-        const sizes = new Float32Array(particleCount);
-        
-        for (let i = 0; i < particleCount; i++) {
-            particles[i * 3] = (Math.random() - 0.5) * 10;
-            particles[i * 3 + 1] = Math.random() * 5;
-            particles[i * 3 + 2] = (Math.random() - 0.5) * 10;
-            sizes[i] = Math.random() * 0.1;
-        }
-        
-        const geometry = new THREE.BufferGeometry();
-        geometry.setAttribute('position', new THREE.BufferAttribute(particles, 3));
-        geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
-        
-        const material = new THREE.PointsMaterial({
-            color: 0xffffff,
-            size: 0.05,
-            transparent: true,
-            opacity: 0.5,
-            blending: THREE.AdditiveBlending,
-            depthWrite: false
-        });
-        
-        const points = new THREE.Points(geometry, material);
-        
-        // Animate particles
-        const animate = () => {
-            const positions = points.geometry.attributes.position.array as Float32Array;
-            for (let i = 0; i < particleCount; i++) {
-                positions[i * 3 + 1] += Math.sin(Date.now() * 0.001 + i) * 0.001;
-                positions[i * 3] += Math.cos(Date.now() * 0.001 + i) * 0.001;
-            }
-            points.geometry.attributes.position.needsUpdate = true;
-            requestAnimationFrame(animate);
-        };
-        animate();
-        
-        return points;
     }
 }
 
