@@ -2,71 +2,60 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mansion Mystery 3D</title>
     <style>
-        body {
+        * {
             margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
             overflow: hidden;
         }
 
-        #game-container {
-            position: relative;
+        #app {
             width: 100vw;
             height: 100vh;
+            position: relative;
         }
 
-        #ui-overlay {
+        .game-ui {
             position: absolute;
-            top: 10px;
-            left: 10px;
+            top: 20px;
+            left: 20px;
             color: white;
             font-family: Arial, sans-serif;
+            z-index: 100;
             pointer-events: none;
         }
 
-        #inventory {
-            position: absolute;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.7);
-            padding: 10px;
-            border-radius: 5px;
-            color: white;
-            display: flex;
-            gap: 10px;
-        }
-
-        .inventory-item {
-            padding: 5px 10px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 3px;
-        }
-
-        #interaction-prompt {
+        .click-to-start {
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
             color: white;
-            background: rgba(0, 0, 0, 0.7);
-            padding: 10px;
-            border-radius: 5px;
-            display: none;
+            font-family: Arial, sans-serif;
+            text-align: center;
+            cursor: pointer;
+            z-index: 100;
         }
     </style>
 </head>
 <body>
-    <div id="game-container">
-        <div id="ui-overlay">
+    <div id="app">
+        <div class="game-ui">
             <h2>Mansion Mystery</h2>
-            <p id="location-info">Current Location: Entrance Hall</p>
+            <p>Current Location: Entrance Hall</p>
         </div>
-        <div id="inventory">
-            <div class="inventory-item">Empty</div>
+        <div class="click-to-start">
+            <h1>Click to Start</h1>
+            <p>Use WASD to move</p>
+            <p>Mouse to look around</p>
         </div>
-        <div id="interaction-prompt">Press E to interact</div>
     </div>
     <script type="module" src="/src/main.ts"></script>
 </body>
