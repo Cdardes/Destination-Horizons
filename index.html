@@ -3,18 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Mansion Mystery - 3D</title>
+    <title>Mansion Mystery 3D</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Arial', sans-serif;
-        }
-
         body {
+            margin: 0;
             overflow: hidden;
-            background-color: #000;
         }
 
         #game-container {
@@ -23,214 +16,58 @@
             height: 100vh;
         }
 
-        #blocker {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.8);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 100;
-        }
-
-        #instructions {
-            color: #fff;
-            text-align: center;
-            font-size: 1.2em;
-            cursor: pointer;
-            padding: 2em;
-            background-color: rgba(0, 0, 0, 0.7);
-            border-radius: 10px;
-            border: 1px solid #333;
-            max-width: 400px;
-        }
-
-        #instructions h1 {
-            font-size: 2em;
-            margin-bottom: 0.5em;
-            color: #ffd700;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-        }
-
-        #instructions p {
-            margin: 0.5em 0;
-            color: #ddd;
-        }
-
-        .crosshair {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 20px;
-            height: 20px;
-            transform: translate(-50%, -50%);
-            pointer-events: none;
-            z-index: 10;
-        }
-
-        .crosshair::before,
-        .crosshair::after {
-            content: '';
-            position: absolute;
-            background-color: rgba(255, 255, 255, 0.7);
-        }
-
-        .crosshair::before {
-            width: 2px;
-            height: 20px;
-            left: 9px;
-            top: 0;
-        }
-
-        .crosshair::after {
-            width: 20px;
-            height: 2px;
-            left: 0;
-            top: 9px;
-        }
-
         #ui-overlay {
             position: absolute;
-            top: 20px;
-            left: 20px;
-            color: #fff;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-            z-index: 20;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-family: Arial, sans-serif;
             pointer-events: none;
         }
 
-        #ui-overlay h2 {
-            font-size: 1.5em;
-            margin-bottom: 0.5em;
-            color: #ffd700;
-        }
-
-        #ui-overlay p {
-            font-size: 1.2em;
-            color: #ddd;
-        }
-
-        #inventory-panel {
-            position: absolute;
-            right: 20px;
-            top: 20px;
-            background-color: rgba(0, 0, 0, 0.7);
-            padding: 1em;
-            border-radius: 10px;
-            border: 1px solid #333;
-            color: #fff;
-            display: none;
-            z-index: 30;
-            min-width: 200px;
-        }
-
-        #inventory-panel h3 {
-            color: #ffd700;
-            margin-bottom: 0.5em;
-            text-align: center;
-        }
-
-        .inventory-item {
-            padding: 0.5em;
-            margin: 0.3em 0;
-            background-color: rgba(255, 255, 255, 0.1);
-            border-radius: 5px;
-            cursor: pointer;
-            transition: background-color 0.2s;
-        }
-
-        .inventory-item:hover {
-            background-color: rgba(255, 255, 255, 0.2);
-        }
-
-        #interaction-menu {
+        #inventory {
             position: absolute;
             bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
-            background-color: rgba(0, 0, 0, 0.7);
-            padding: 1em;
-            border-radius: 10px;
-            border: 1px solid #333;
-            color: #fff;
-            display: none;
-            z-index: 30;
-        }
-
-        #interaction-menu h3 {
-            color: #ffd700;
-            margin-bottom: 0.5em;
-            text-align: center;
-        }
-
-        .menu-option {
-            padding: 0.5em 1em;
-            margin: 0.3em 0;
-            background-color: rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
             border-radius: 5px;
-            cursor: pointer;
-            transition: background-color 0.2s;
-            text-align: center;
+            color: white;
+            display: flex;
+            gap: 10px;
         }
 
-        .menu-option:hover {
-            background-color: rgba(255, 255, 255, 0.2);
+        .inventory-item {
+            padding: 5px 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
         }
 
-        .notification {
-            position: fixed;
+        #interaction-prompt {
+            position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            background-color: rgba(0, 0, 0, 0.8);
-            color: #fff;
-            padding: 1em 2em;
-            border-radius: 10px;
-            border: 1px solid #333;
-            z-index: 1000;
-            animation: fadeInOut 3s ease-in-out forwards;
-        }
-
-        @keyframes fadeInOut {
-            0% { opacity: 0; }
-            10% { opacity: 1; }
-            90% { opacity: 1; }
-            100% { opacity: 0; }
+            color: white;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+            display: none;
         }
     </style>
 </head>
 <body>
     <div id="game-container">
-        <div id="blocker">
-            <div id="instructions">
-                <h1>The Mansion Mystery</h1>
-                <p>Click to start</p>
-                <br>
-                <p>Move: WASD</p>
-                <p>Look: Mouse</p>
-                <p>Interact: Left Click</p>
-                <p>Inventory: E</p>
-                <p>Menu: ESC</p>
-            </div>
-        </div>
-        <div class="crosshair"></div>
         <div id="ui-overlay">
-            <h2>Current Location: <span id="location-name">Entrance Hall</span></h2>
-            <p id="turns-remaining">Turns remaining: 20</p>
+            <h2>Mansion Mystery</h2>
+            <p id="location-info">Current Location: Entrance Hall</p>
         </div>
-        <div id="inventory-panel">
-            <h3>Inventory</h3>
-            <div id="inventory-items"></div>
+        <div id="inventory">
+            <div class="inventory-item">Empty</div>
         </div>
-        <div id="interaction-menu">
-            <h3>Actions</h3>
-            <div id="menu-options"></div>
-        </div>
+        <div id="interaction-prompt">Press E to interact</div>
     </div>
-    <script type="module">
-        import { MansionMystery } from '/src/main.js';
-        window.game = new MansionMystery();
-    </script>
+    <script type="module" src="/src/main.ts"></script>
 </body>
 </html> 
