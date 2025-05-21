@@ -25,6 +25,20 @@ interface GameSettings {
     ambientVolume: number;
 }
 
+interface Room {
+    name: string;
+    position: THREE.Vector3;
+    connections: string[];
+    items?: InteractiveItem[];
+}
+
+interface InteractiveItem {
+    name: string;
+    mesh: THREE.Mesh;
+    description: string;
+    isCollected: boolean;
+}
+
 class Game {
     private scene: THREE.Scene;
     private camera: THREE.PerspectiveCamera;
@@ -40,6 +54,11 @@ class Game {
     private settings: GameSettings;
     private gui: GUI = new GUI();
     private soundManager: SoundManager;
+    private raycaster: THREE.Raycaster;
+    private currentRoom: string = 'entrance_hall';
+    private rooms: Map<string, Room> = new Map();
+    private interactiveObjects: THREE.Mesh[] = [];
+    private inventory: string[] = [];
 
     constructor() {
         console.log('Initializing game...');
@@ -55,6 +74,9 @@ class Game {
             ambientVolume: 0.3
         };
 
+        // Initialize rooms
+        this.initializeRooms();
+
         // Create scene
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(0x1a1a1a);
@@ -67,6 +89,9 @@ class Game {
         this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         this.camera.position.y = 1.6;
         this.camera.position.z = 5;
+
+        // Initialize raycaster for interactions
+        this.raycaster = new THREE.Raycaster();
 
         // Initialize audio
         const listener = new THREE.AudioListener();
@@ -116,6 +141,29 @@ class Game {
         this.animate();
         
         console.log('Game initialized successfully');
+    }
+
+    private initializeRooms(): void {
+        this.rooms = new Map([
+            ['entrance_hall', {
+                name: 'Entrance Hall',
+                position: new THREE.Vector3(0, 0, 0),
+                connections: ['library', 'dining_room'],
+                items: []
+            }],
+            ['library', {
+                name: 'Library',
+                position: new THREE.Vector3(-10, 0, 0),
+                connections: ['entrance_hall', 'study'],
+                items: []
+            }],
+            ['dining_room', {
+                name: 'Dining Room',
+                position: new THREE.Vector3(10, 0, 0),
+                connections: ['entrance_hall', 'kitchen'],
+                items: []
+            }]
+        ]);
     }
 
     private setupGUI(): void {
@@ -252,11 +300,100 @@ class Game {
             this.camera.updateProjectionMatrix();
             this.renderer.setSize(window.innerWidth, window.innerHeight);
         });
+
+        // Add interaction key (E)
+        document.addEventListener('keydown', (event) => {
+            if (event.code === 'KeyE') {
+                this.interact();
+            }
+        });
+
+        // Add room transition key (Space)
+        document.addEventListener('keydown', (event) => {
+            if (event.code === 'Space') {
+                this.checkRoomTransition();
+            }
+        });
     }
 
     private updateFootstepSounds(): void {
         const isWalking = this.moveForward || this.moveBackward || this.moveLeft || this.moveRight;
         this.soundManager.playFootsteps(isWalking);
+    }
+
+    private interact(): void {
+        if (!this.controls.isLocked) return;
+
+        const center = new THREE.Vector2(0, 0);
+        this.raycaster.setFromCamera(center, this.camera);
+
+        const intersects = this.raycaster.intersectObjects(this.interactiveObjects);
+        
+        if (intersects.length > 0) {
+            const object = intersects[0].object;
+            if (object.userData.type === 'item') {
+                this.collectItem(object);
+            } else if (object.userData.type === 'door') {
+                this.tryDoorTransition(object);
+            }
+        }
+    }
+
+    private collectItem(object: THREE.Object3D): void {
+        if (!object.userData.isCollected) {
+            object.userData.isCollected = true;
+            this.inventory.push(object.userData.name);
+            this.soundManager.playSound('pickup');
+            object.visible = false;
+
+            // Update inventory display
+            this.updateInventoryDisplay();
+        }
+    }
+
+    private updateInventoryDisplay(): void {
+        const inventoryItems = document.querySelector('.inventory-items');
+        if (inventoryItems) {
+            inventoryItems.innerHTML = this.inventory
+                .map(item => `<div class="inventory-item">${item}</div>`)
+                .join('');
+        }
+    }
+
+    private checkRoomTransition(): void {
+        const currentRoom = this.rooms.get(this.currentRoom);
+        if (!currentRoom) return;
+
+        // Check if we're near any room connections
+        for (const connection of currentRoom.connections) {
+            const targetRoom = this.rooms.get(connection);
+            if (targetRoom) {
+                const distance = this.camera.position.distanceTo(targetRoom.position);
+                if (distance < 3) { // Within 3 units of the door
+                    this.transitionToRoom(connection);
+                    break;
+                }
+            }
+        }
+    }
+
+    private transitionToRoom(roomId: string): void {
+        const targetRoom = this.rooms.get(roomId);
+        if (!targetRoom) return;
+
+        this.currentRoom = roomId;
+        this.soundManager.playSound('door');
+
+        // Update location display
+        const locationDisplay = document.getElementById('location-display');
+        if (locationDisplay) {
+            locationDisplay.textContent = `Current Location: ${targetRoom.name}`;
+            locationDisplay.style.display = 'block';
+        }
+
+        // Teleport player to new room
+        this.camera.position.copy(targetRoom.position);
+        this.camera.position.y = 1.6; // Maintain eye level
     }
 
     private createScene(): void {
@@ -404,7 +541,68 @@ class Game {
         });
         createFurniture(vaseGeometry, vaseMaterial, -3, 1.3, -3);
 
+        // Add interactive objects
+        this.createInteractiveObjects();
+
         console.log('Scene created successfully');
+    }
+
+    private createInteractiveObjects(): void {
+        // Create a door mesh
+        const doorGeometry = new THREE.BoxGeometry(1, 2, 0.1);
+        const doorMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0x8b4513,
+            roughness: 0.8,
+            metalness: 0.2
+        });
+
+        // Add doors for room connections
+        this.rooms.forEach((room, roomId) => {
+            room.connections.forEach(connectionId => {
+                const targetRoom = this.rooms.get(connectionId);
+                if (targetRoom) {
+                    const direction = targetRoom.position.clone().sub(room.position).normalize();
+                    const doorPosition = room.position.clone().add(direction.multiplyScalar(5));
+                    
+                    const door = new THREE.Mesh(doorGeometry, doorMaterial);
+                    door.position.copy(doorPosition);
+                    door.position.y = 1; // Door height
+                    door.lookAt(targetRoom.position);
+                    
+                    door.userData = {
+                        type: 'door',
+                        targetRoom: connectionId
+                    };
+
+                    this.scene.add(door);
+                    this.interactiveObjects.push(door);
+                }
+            });
+        });
+
+        // Add some collectible items
+        const itemGeometry = new THREE.SphereGeometry(0.2);
+        const itemMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0xffd700,
+            roughness: 0.3,
+            metalness: 0.7
+        });
+
+        const addItem = (position: THREE.Vector3, name: string) => {
+            const item = new THREE.Mesh(itemGeometry, itemMaterial);
+            item.position.copy(position);
+            item.userData = {
+                type: 'item',
+                name: name,
+                isCollected: false
+            };
+            this.scene.add(item);
+            this.interactiveObjects.push(item);
+        };
+
+        // Add some example items
+        addItem(new THREE.Vector3(2, 1, -2), 'Strange Key');
+        addItem(new THREE.Vector3(-2, 1, 2), 'Mysterious Note');
     }
 
     private animate(): void {
@@ -433,9 +631,49 @@ class Game {
             // Apply movement
             this.controls.moveRight(-this.velocity.x * delta);
             this.controls.moveForward(-this.velocity.z * delta);
+
+            // Check for nearby interactive objects
+            this.checkNearbyObjects();
         }
 
         this.renderer.render(this.scene, this.camera);
+    }
+
+    private checkNearbyObjects(): void {
+        const center = new THREE.Vector2(0, 0);
+        this.raycaster.setFromCamera(center, this.camera);
+
+        const intersects = this.raycaster.intersectObjects(this.interactiveObjects);
+        
+        // Update crosshair and interaction prompt
+        const crosshair = document.querySelector('.crosshair') as HTMLElement;
+        const prompt = document.querySelector('.interaction-prompt') as HTMLElement;
+        
+        if (intersects.length > 0) {
+            const object = intersects[0].object;
+            if (crosshair) {
+                crosshair.style.backgroundColor = '#ffd700';
+            }
+            if (prompt) {
+                prompt.textContent = object.userData.type === 'item' 
+                    ? `${object.userData.name.replace(/_/g, ' ')}`
+                    : 'Door';
+                prompt.style.opacity = '1';
+            }
+        } else {
+            if (crosshair) {
+                crosshair.style.backgroundColor = 'white';
+            }
+            if (prompt) {
+                prompt.style.opacity = '0';
+            }
+        }
+    }
+
+    private tryDoorTransition(object: THREE.Object3D): void {
+        if (object.userData.targetRoom) {
+            this.transitionToRoom(object.userData.targetRoom);
+        }
     }
 }
 

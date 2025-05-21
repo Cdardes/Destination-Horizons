@@ -151,6 +151,21 @@
             transform: translateY(-50%);
         }
 
+        .interaction-prompt {
+            position: absolute;
+            top: 55%;
+            left: 50%;
+            transform: translate(-50%, 0);
+            color: #ffd700;
+            font-size: 14px;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            pointer-events: none;
+            white-space: nowrap;
+        }
+
         .generate-sounds {
             position: absolute;
             bottom: 20px;
@@ -194,6 +209,7 @@
             </div>
         </div>
         <div class="crosshair"></div>
+        <div class="interaction-prompt"></div>
         <button class="generate-sounds" onclick="window.generateSounds()">Generate Sound Files</button>
     </div>
     <script type="module" src="/src/main.ts"></script>
