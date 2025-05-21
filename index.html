@@ -166,6 +166,24 @@
             white-space: nowrap;
         }
 
+        .dialogue-box {
+            position: absolute;
+            bottom: 20%;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: #ffffff;
+            padding: 15px 20px;
+            border-radius: 5px;
+            font-size: 16px;
+            max-width: 80%;
+            display: none;
+            text-align: center;
+            border: 1px solid #ffd700;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+        }
+
         .generate-sounds {
             position: absolute;
             bottom: 20px;
@@ -210,7 +228,8 @@
         </div>
         <div class="crosshair"></div>
         <div class="interaction-prompt"></div>
-        <button class="generate-sounds" onclick="window.generateSounds()">Generate Sound Files</button>
+        <div class="dialogue-box" id="dialogue-box"></div>
+        <button class="generate-sounds" onclick="window.generateSounds()">Generate Sounds</button>
     </div>
     <script type="module" src="/src/main.ts"></script>
 </body>
