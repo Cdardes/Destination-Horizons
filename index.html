@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mansion Mystery 3D</title>
+    <title>Mansion Mystery</title>
     <style>
         * {
             margin: 0;
@@ -14,6 +14,7 @@
 
         body {
             overflow: hidden;
+            font-family: 'Arial', sans-serif;
         }
 
         #app {
@@ -27,9 +28,20 @@
             top: 20px;
             left: 20px;
             color: white;
-            font-family: Arial, sans-serif;
             z-index: 100;
             pointer-events: none;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        .game-ui h2 {
+            font-size: 24px;
+            margin-bottom: 10px;
+            color: #ffd700;
+        }
+
+        .game-ui p {
+            font-size: 16px;
+            margin: 5px 0;
         }
 
         .click-to-start {
@@ -37,11 +49,125 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
+            padding: 40px;
+            background: rgba(0, 0, 0, 0.8);
             color: white;
-            font-family: Arial, sans-serif;
-            text-align: center;
+            border: 2px solid #ffd700;
             cursor: pointer;
-            z-index: 100;
+            text-align: center;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .click-to-start h1 {
+            font-size: 32px;
+            margin-bottom: 20px;
+            color: #ffd700;
+        }
+
+        .click-to-start p {
+            font-size: 18px;
+            margin: 10px 0;
+            color: #ffffff;
+        }
+
+        .click-to-start:hover {
+            background: rgba(0, 0, 0, 0.9);
+            transform: translate(-50%, -50%) scale(1.05);
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
+        }
+
+        #location-display {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: white;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #ffd700;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .inventory {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 8px;
+            color: white;
+            max-width: 300px;
+        }
+
+        .inventory h3 {
+            color: #ffd700;
+            margin-bottom: 10px;
+        }
+
+        .inventory-items {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .inventory-item {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 20px;
+            pointer-events: none;
+            opacity: 0.7;
+        }
+
+        .crosshair::before,
+        .crosshair::after {
+            content: '';
+            position: absolute;
+            background: white;
+        }
+
+        .crosshair::before {
+            width: 2px;
+            height: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .crosshair::after {
+            width: 20px;
+            height: 2px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        .generate-sounds {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            border: 2px solid #ffd700;
+            cursor: pointer;
+            font-family: Arial, sans-serif;
+            border-radius: 5px;
+            transition: all 0.3s ease;
+        }
+
+        .generate-sounds:hover {
+            background: rgba(0, 0, 0, 0.9);
+            transform: scale(1.05);
         }
     </style>
 </head>
@@ -49,13 +175,26 @@
     <div id="app">
         <div class="game-ui">
             <h2>Mansion Mystery</h2>
-            <p>Current Location: Entrance Hall</p>
+            <p>Investigate the disappearance of Lord Blackwood</p>
+            <p>Time remaining: <span id="time-remaining">20:00</span></p>
         </div>
         <div class="click-to-start">
-            <h1>Click to Start</h1>
+            <h1>Mansion Mystery</h1>
+            <p>A 3D Investigation Game</p>
             <p>Use WASD to move</p>
             <p>Mouse to look around</p>
+            <p>E to interact</p>
+            <p>Click to start</p>
         </div>
+        <div id="location-display">Current Location: Entrance Hall</div>
+        <div class="inventory">
+            <h3>Inventory</h3>
+            <div class="inventory-items">
+                <!-- Items will be added dynamically -->
+            </div>
+        </div>
+        <div class="crosshair"></div>
+        <button class="generate-sounds" onclick="window.generateSounds()">Generate Sound Files</button>
     </div>
     <script type="module" src="/src/main.ts"></script>
 </body>
