@@ -74,7 +74,12 @@ class Game {
             ambientVolume: 0.3
         };
 
-        // Initialize rooms
+        // Initialize vectors and clock
+        this.velocity = new THREE.Vector3();
+        this.direction = new THREE.Vector3();
+        this.clock = new THREE.Clock();
+
+        // Initialize rooms first
         this.initializeRooms();
 
         // Create scene
@@ -123,24 +128,19 @@ class Game {
         // Create controls
         this.controls = new PointerLockControls(this.camera, document.body);
 
-        // Initialize vectors and clock
-        this.velocity = new THREE.Vector3();
-        this.direction = new THREE.Vector3();
-        this.clock = new THREE.Clock();
-
         // Setup GUI
         this.setupGUI();
 
         // Add event listeners
         this.setupEventListeners();
 
-        // Create basic scene
+        // Create basic scene (this needs to happen after rooms are initialized)
         this.createScene();
+        
+        console.log('Game initialized successfully');
 
         // Start animation loop
         this.animate();
-        
-        console.log('Game initialized successfully');
     }
 
     private initializeRooms(): void {
@@ -655,9 +655,12 @@ class Game {
                 crosshair.style.backgroundColor = '#ffd700';
             }
             if (prompt) {
-                prompt.textContent = object.userData.type === 'item' 
-                    ? `${object.userData.name.replace(/_/g, ' ')}`
-                    : 'Door';
+                if (object.userData.type === 'door') {
+                    const targetRoom = this.rooms.get(object.userData.targetRoom);
+                    prompt.textContent = targetRoom ? `Door to ${targetRoom.name}` : 'Door';
+                } else {
+                    prompt.textContent = object.userData.name.replace(/_/g, ' ');
+                }
                 prompt.style.opacity = '1';
             }
         } else {
@@ -672,7 +675,10 @@ class Game {
 
     private tryDoorTransition(object: THREE.Object3D): void {
         if (object.userData.targetRoom) {
-            this.transitionToRoom(object.userData.targetRoom);
+            const targetRoom = this.rooms.get(object.userData.targetRoom);
+            if (targetRoom) {
+                this.transitionToRoom(object.userData.targetRoom);
+            }
         }
     }
 }
